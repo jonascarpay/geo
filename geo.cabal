@@ -21,7 +21,10 @@ extra-doc-files:
 --   location: git://github.com/FIXME/geo.git
 
 common common-options
-  build-depends:    base >=4.9 && <5
+  build-depends:
+    , base   >=4.9 && <5
+    , gloss
+
   default-language: Haskell2010
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-uni-patterns
@@ -31,10 +34,16 @@ common common-options
 library
   import:          common-options
   hs-source-dirs:  src
-  exposed-modules: Lib
+  exposed-modules: Multivector
+
+  -- Dynamic
+  -- Lib
+  -- Weird
+
   build-depends:
     , containers
     , mtl
+    , vector
 
 executable geo-exe
   import:         common-options
@@ -49,9 +58,9 @@ test-suite geo-test
   hs-source-dirs: test
   main-is:        Spec.hs
   build-depends:
+    , geo
     , hspec
     , HUnit
-    , geo
     , QuickCheck
 
   ghc-options:    -threaded -rtsopts -with-rtsopts=-N

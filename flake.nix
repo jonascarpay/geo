@@ -1,7 +1,7 @@
 {
   description = "geo";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/25.05";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = inputs:
@@ -32,6 +32,8 @@
                 hspkgs.hlint
                 hspkgs.ormolu
                 pkgs.bashInteractive
+                pkgs.xwayland-satellite
+                # pkgs.glfw
               ];
             };
           };
