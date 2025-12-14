@@ -34,10 +34,11 @@ common common-options
 library
   import:          common-options
   hs-source-dirs:  src
-  exposed-modules: Multivector
+  exposed-modules:
+    Multivector
+    Signature
 
   -- Dynamic
-  -- Lib
   -- Weird
 
   build-depends:

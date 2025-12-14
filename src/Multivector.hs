@@ -12,25 +12,17 @@ module Multivector where
 
 import Data.Data (Proxy (..))
 import Data.List (intercalate)
+import Signature
 
-data Metric = Positive | Null | Negative
+data Multivector (sig :: Signature) a where
+  Scalar :: a -> Multivector 'Empty a
+  Dim :: (KnownMetric metric) => Multivector l a -> Multivector l a -> Multivector (Extend metric l) a
 
-class KnownMetric (s :: Metric) where
-  metric :: p s -> Metric
+instance Functor (Multivector sig) where
+  fmap f (Scalar a) = Scalar (f a)
+  fmap f (Dim a b) = Dim (fmap f a) (fmap f b)
 
-instance KnownMetric Positive where metric _ = Positive
-
-instance KnownMetric Null where metric _ = Null
-
-instance KnownMetric Negative where metric _ = Negative
-
-data Signature = Extend Metric Signature | Empty
-
-data Multivector (sig :: Signature) where
-  Scalar :: Double -> Multivector 'Empty
-  Dim :: (KnownMetric metric) => Multivector l -> Multivector l -> Multivector (Extend metric l)
-
-instance Num (Multivector 'Empty) where
+instance (Num a) => Num (Multivector 'Empty a) where
   Scalar a + Scalar x = Scalar (a + x)
   Scalar a - Scalar x = Scalar (a - x)
   Scalar a * Scalar x = Scalar (a * x)
@@ -39,7 +31,7 @@ instance Num (Multivector 'Empty) where
   abs = error "not implemented"
   signum = error "not implemented"
 
-instance (KnownMetric m, Num (Multivector sig)) => Num (Multivector (Extend m sig)) where
+instance (Num a, KnownMetric m, Num (Multivector sig a)) => Num (Multivector (Extend m sig) a) where
   Dim a b + Dim x y = Dim (a + x) (b + y)
 
   Dim a b - Dim x y = Dim (a - x) (b - y)
@@ -54,26 +46,15 @@ instance (KnownMetric m, Num (Multivector sig)) => Num (Multivector (Extend m si
   abs = error "not implemented"
   signum = error "not implemented"
 
-class Scalar a where
-  scalar :: Double -> a
-
-instance Scalar (Multivector 'Empty) where scalar = Scalar
-
-instance
-  (Scalar (Multivector sig), KnownMetric m) =>
-  Scalar (Multivector (Extend m sig))
-  where
-  scalar x = Dim (scalar 0) (scalar x)
-
 metricD :: Metric -> Integer
 metricD Positive = 1
 metricD Null = 0
 metricD Negative = -1
 
 class WMetric sig where
-  basis :: [Multivector sig]
-  zero :: Multivector sig
-  one :: Multivector sig
+  basis :: (Num a) => [Multivector sig a]
+  zero :: (Num a) => Multivector sig a
+  one :: (Num a) => Multivector sig a
 
 instance WMetric Empty where
   basis = []
@@ -85,19 +66,21 @@ instance (KnownMetric m, WMetric sig) => WMetric (Extend m sig) where
   zero = Dim zero zero
   one = Dim zero one
 
-decompose :: Multivector sig -> [(Double, [Int])]
+decompose :: Multivector sig a -> [(a, [Int])]
 decompose = go 1 []
   where
-    go :: Int -> [Int] -> Multivector sig -> [(Double, [Int])]
+    go :: Int -> [Int] -> Multivector sig a -> [(a, [Int])]
     go _ ixs (Scalar s) = [(s, ixs)]
     go ix ixs (Dim a b) = go (ix + 1) (ix : ixs) a <> go (ix + 1) ixs b
 
-instance Show (Multivector sig) where
-  show mv = intercalate " + " [show a <> " e" <> show b | (a, b) <- decompose mv, a /= 0]
+instance (Eq a, Num a, Show a) => Show (Multivector sig a) where
+  show mv = case [show a <> " e" <> show b | (a, b) <- decompose mv, a /= 0] of
+    [] -> "0"
+    xs -> intercalate " + " xs
 
-hat :: Multivector sig -> Multivector sig
+hat :: (Num a) => Multivector sig a -> Multivector sig a
 hat = go 1
   where
-    go :: Double -> Multivector sig -> Multivector sig
+    go :: (Num a) => a -> Multivector sig a -> Multivector sig a
     go !sign (Scalar k) = Scalar $ sign * k
     go !sign (Dim a b) = Dim (go (-sign) a) (go sign b)
