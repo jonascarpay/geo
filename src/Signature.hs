@@ -3,7 +3,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Signature where
+module Signature
+  ( Metric (..),
+    Cl,
+    KnownMetric (..),
+    Signature (..),
+  )
+where
 
 import GHC.TypeNats (Natural, type (-))
 
@@ -22,7 +28,7 @@ data Signature = Extend Metric Signature | Empty
 
 type family Cl (pos :: Natural) zero neg :: Signature where
   Cl 0 zero neg = Clifford1 zero neg
-  Cl pos zero neg = Extend Positive (Clifford1 (pos - 1) neg)
+  Cl pos zero neg = Extend Positive (Cl (pos - 1) zero neg)
 
 type family Clifford1 zero neg :: Signature where
   Clifford1 0 neg = Clifford2 neg

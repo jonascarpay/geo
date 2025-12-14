@@ -74,7 +74,7 @@ decompose = go 1 []
     go ix ixs (Dim a b) = go (ix + 1) (ix : ixs) a <> go (ix + 1) ixs b
 
 instance (Eq a, Num a, Show a) => Show (Multivector sig a) where
-  show mv = case [show a <> " e" <> show b | (a, b) <- decompose mv, a /= 0] of
+  show mv = case [show a <> if null b then mempty else " e" <> show b | (a, b) <- decompose mv, a /= 0] of
     [] -> "0"
     xs -> intercalate " + " xs
 
