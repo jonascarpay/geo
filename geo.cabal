@@ -36,7 +36,9 @@ library
   hs-source-dirs:  src
   exposed-modules:
     Multivector
+    Polynomial
     Signature
+    Util
 
   -- Dynamic
   -- Weird
