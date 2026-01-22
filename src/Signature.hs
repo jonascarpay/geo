@@ -9,6 +9,8 @@ module Signature
     KnownMetric (..),
     Signature (..),
     -- Common algebras
+    VGA0D,
+    VGA1D,
     VGA2D,
     VGA3D,
     PGA2D,
@@ -49,15 +51,22 @@ type family ClPos (p :: Natural) :: Signature where
   ClPos p = Extend Positive (ClPos (p - 1))
 
 -- Vanilla Geometric Algebra (Euclidean)
+type VGA0D = Cl 0 0 0
+
+type VGA1D = Cl 1 0 0
+
 type VGA2D = Cl 2 0 0
+
 type VGA3D = Cl 3 0 0
 
 -- Projective Geometric Algebra
 type PGA2D = Cl 2 0 1
+
 type PGA3D = Cl 3 0 1
 
 -- Conformal Geometric Algebra
 type CGA2D = Cl 3 1 0
+
 type CGA3D = Cl 4 1 0
 
 -- Spacetime Algebra (Minkowski, +---)

@@ -2,7 +2,14 @@
 
 module Main where
 
-import Graphics.Gloss
+import Multivector
+import Signature
 
 main :: IO ()
-main = display (InWindow "My Window" (200, 200) (10, 10)) white (Circle 80)
+main =
+  let [px, py, pz, pw] = basis :: [SymbolicMV PGA3D String]
+      [vx, vy, vz] = basis :: [SymbolicMV VGA3D String]
+      va = "va_x " * vx + "va_y" * vy + "va_z" * vz
+      vb = "b1" * vx + "b2" * vy + "b3" * vz
+      bva = "bva_yz " * vy * vz + "bva_xz " * vx * vz + "bva_xy " * vx * vy
+   in pretty $ va * bva

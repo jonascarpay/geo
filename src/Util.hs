@@ -1,4 +1,8 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Util (toSubscript, toSuperscript) where
+
+import Data.Functor.Identity
 
 toSubscript :: Char -> Char
 toSubscript '0' = '₀'

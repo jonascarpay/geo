@@ -1,4 +1,6 @@
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Polynomial
   ( Poly (..),
@@ -15,9 +17,11 @@ import qualified Data.Map.Strict as Map
 import Data.String (IsString (..))
 import qualified Util
 
--- A polynomial: maps monomials (variable -> exponent) to coefficients
+-- | A polynomial: maps monomials (variable -> exponent) to coefficients.
+-- A univariate polynomial, i.e. with powers of one variable, would be Poly () a.
 newtype Poly var coeff = Poly (Map (Map var Int) coeff)
-  deriving (Eq, Ord)
+  deriving stock (Eq, Ord)
+  deriving newtype (Show)
 
 poly :: (Eq coeff, Num coeff) => Map (Map var Int) coeff -> Poly var coeff
 poly = Poly . Map.filter (/= 0)
@@ -57,11 +61,14 @@ showPoly fVar fCoeff (Poly m) = case Map.toAscList m of
     showTail t = case fTerm t of
       (t', True) -> " + " <> t'
       (t', False) -> " - " <> t'
-    fVars vars = concatMap (uncurry fVar) (Map.toAscList vars)
-    fTerm (vars, 1) = (fVars vars, True)
-    fTerm (vars, -1) = (fVars vars, False)
-    fTerm (_, 0) = error "impossible"
-    fTerm (vars, coeff) = (fCoeff coeff <> fVars vars, coeff > 0)
+    fVars = concatMap (uncurry fVar)
+    fTerm (vars', coeff') = case (Map.toAscList vars', coeff') of
+      (_, 0) -> error "impossible"
+      ([], 1) -> ("1", True)
+      ([], -1) -> ("1", False)
+      (vars, 1) -> (fVars vars, True)
+      (vars, -1) -> (fVars vars, False)
+      (vars, coeff) -> (fCoeff coeff <> fVars vars, coeff > 0)
 
 showTerm :: (Ord a, Num a, Show a) => Poly String a -> String
 showTerm = showPoly showVar show
