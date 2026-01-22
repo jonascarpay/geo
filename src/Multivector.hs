@@ -18,8 +18,9 @@ import Control.Monad.State (State, evalState)
 import Data.Bool (bool)
 import Data.Data (Proxy (..))
 import Data.String (IsString)
+import Expr
 import GHC.Exts (IsString (..))
-import Polynomial (Poly (Poly), var)
+import Polynomial (Poly (Poly), toExpr, var)
 import qualified Polynomial as Poly
 import Signature
 import qualified Util
@@ -160,11 +161,14 @@ showVar :: Int -> Int -> String
 showVar n 1 = "e" <> fmap Util.toSubscript (show n)
 showVar _ _ = error "impossible"
 
-showSymbolic :: (WMetric sig) => SymbolicMV sig String -> String
-showSymbolic = Poly.showPoly showVar (\c -> "(" <> Poly.showTerm c <> ")") . toPoly
+mvExpr :: (WMetric sig) => SymbolicMV sig String -> Expr
+mvExpr = toExpr (\n -> Var $ "e" <> fmap Util.toSubscript (show n)) mExpr . toPoly
+
+mExpr :: Poly String Int -> Expr
+mExpr = toExpr Var intLit
 
 pretty :: (WMetric sig) => SymbolicMV sig String -> IO ()
-pretty mv = putStrLn (showSymbolic mv)
+pretty mv = putStrLn (showExpr $ mvExpr mv)
 
 mapGrade :: forall sig a b. (Int -> a -> b) -> Multivector sig a -> Multivector sig b
 mapGrade f = go 0
@@ -176,6 +180,10 @@ mapGrade f = go 0
 -- | Grade projection: extract the grade-k component of a multivector
 grade :: (Num a) => Int -> Multivector sig a -> Multivector sig a
 grade k = mapGrade $ \dim a -> if dim == k then a else 0
+
+grade0 :: Multivector sig a -> a
+grade0 (Scalar a) = a
+grade0 (Dim _ b) = grade0 b
 
 hat :: (Num a) => Multivector sig a -> Multivector sig a
 hat = mapGrade (bool negate id . even)
@@ -200,10 +208,5 @@ wedge :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
 wedge (Scalar a) (Scalar b) = Scalar (a * b)
 wedge (Dim a b) (Dim c d) = Dim (plus (wedge a (hat d)) (wedge b c)) (wedge b d)
 
--- | Infix wedge product
-(∧) :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
-(∧) = wedge
-
--- | Infix inner product
-(·) :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
-(·) = inner
+normSquared :: (Num a, Num (Multivector sig a)) => Multivector sig a -> a
+normSquared a = grade0 $ rev a * a

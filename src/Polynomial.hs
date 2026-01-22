@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Polynomial
   ( Poly (..),
@@ -8,6 +9,7 @@ module Polynomial
     scalar,
     showPoly,
     showTerm,
+    toExpr,
   )
 where
 
@@ -15,6 +17,7 @@ import Data.List (intercalate)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.String (IsString (..))
+import Expr
 import qualified Util
 
 -- | A polynomial: maps monomials (variable -> exponent) to coefficients.
@@ -49,6 +52,12 @@ instance (Ord var, Eq coeff, Num coeff) => Semigroup (Poly var coeff) where
 
 instance (Ord var, Eq coeff, Num coeff) => Monoid (Poly var coeff) where
   mempty = Poly mempty
+
+toExpr :: forall var coeff. (var -> Expr) -> (coeff -> Expr) -> Poly var coeff -> Expr
+toExpr fVar fCoeff (Poly m) = foldr (Sum . monoToExpr) (Lit 0) (Map.toAscList m)
+  where
+    monoToExpr :: (Map var Int, coeff) -> Expr
+    monoToExpr (vars, coeff) = Product (fCoeff coeff) (foldr (\(v, ex) t -> Product (Pow (fVar v) ex) t) (Lit 1) (Map.toAscList vars))
 
 showPoly :: (Ord coeff, Num coeff) => (var -> Int -> String) -> (coeff -> String) -> Poly var coeff -> String
 showPoly fVar fCoeff (Poly m) = case Map.toAscList m of
