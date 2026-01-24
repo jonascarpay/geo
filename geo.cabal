@@ -47,6 +47,7 @@ library
   build-depends:
     , containers
     , mtl
+    , prettyprinter
     , vector
 
 executable geo-exe

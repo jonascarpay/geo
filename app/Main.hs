@@ -33,27 +33,40 @@ generic basis syms = sum ((\(b,v) -> var v * b) <$> zip basis syms)
 subscripted :: String -> [String]
 subscripted c = [c <> fmap toSubscript (show i) | i <- [(1::Int)..]]
 
+subscripted0 :: String -> [String]
+subscripted0 c = [c <> fmap toSubscript (show i) | i <- [(0::Int)..]]
+
 main :: IO ()
 main = do
-  let pga0 = 1 :: SymbolicMV PGA3D String
-      pga1 = basis :: [SymbolicMV PGA3D String]
-      pga2 = bivectorBase pga1
-      pga3 = trivectorBase pga1
-      pga4 = quadvectorBase pga1
-      vga = basis :: [SymbolicMV VGA3D String]
+  let [x,y,z,w] = basis :: [SymbolicMV PGA3D String]
 
-      p1 = generic pga1 (subscripted "p1")
-      p2 = generic pga1 (subscripted "p2")
+      -- pointbasis = [y*z*w, x*z*w, x*y*w, x*y*z]
+      pointbasis = [y*z*w, x*z*w, x*y*w]
+      pointvars  = ["yzw", "xzw", "xyz", "xyz"]
 
-      l1 = generic pga2 (subscripted "l1")
-      l2 = generic pga2 (subscripted "l2")
+      linebasis = [x*y, x*z, y*z, x*w, y*w, z*w]
+      linevars  = ["xy", "xz", "yz", "xw", "yw", "zw"]
 
-      t1 = generic pga3 (subscripted "t1")
-      t2 = generic pga3 (subscripted "t2")
+      motorbasis = [1, x*y, x* z, y* z, x*w, y*w, z*w, x*y*z*w]
+      motorvars = ["s", "xy", "xz", "yz", "xw", "yw", "zw", "xyzw"]
 
-      m = generic ((pga0 : pga2) <> pga4) (subscripted "m")
+      -- [xy,xz,xw,yz,yw,zw] = pga2
+
+      -- p1 = generic pga1 (subscripted "p1")
+      -- p2 = generic pga1 (subscripted "p2")
+
+      -- l = generic pga2 (subscripted "l")
+      -- lr = generic [xy,xz,yz] (subscripted "lr")
+      -- l1 = generic pga2 (subscripted "l1")
+      -- l2 = generic pga2 (subscripted "l2")
+
+      -- t1 = generic pga3 (subscripted "t1")
+      -- t2 = generic pga3 (subscripted "t2")
+
+      m = generic motorbasis (("m." <>) <$> motorvars)
+      l = generic linebasis (("l." <>) <$> linevars)
+      t = generic pointbasis (("t." <>) <$> pointvars)
+      -- m2 = generic motorbasis (("rhs." <>) <$> motorvars)
 
   -- print $ mExpr $ normSquared p1
-  -- print . mvExpr $ p1
-  -- print . mvExpr $ l1
-  print . mvExpr $ rev m * l1 * m
+  print . mvExpr $  m * t * rev m
