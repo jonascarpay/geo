@@ -104,9 +104,10 @@ class WMetric sig where
   scalarMV :: (Num a) => a -> Multivector sig a
   nullMV :: Multivector sig ()
   dual :: (Num a) => Multivector sig a -> Multivector sig a
+  withMetric :: Multivector sig a -> Multivector sig (a, [Metric])
 
-  -- TODO test aB = left a B + wedge a B
-  leftContraction :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
+-- TODO test aB = left a B + wedge a B
+-- leftContraction :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
 
 instance WMetric Empty where
   dimSig _ = 0
@@ -115,7 +116,8 @@ instance WMetric Empty where
   one = Scalar 1
   scalarMV = Scalar
   nullMV = Scalar ()
-  leftContraction (Scalar a) (Scalar b) = Scalar (a * b)
+
+  -- leftContraction (Scalar a) (Scalar b) = Scalar (a * b)
   dual (Scalar s) = Scalar s
 
 instance (KnownMetric m, WMetric sig) => WMetric (Extend m sig) where
@@ -125,9 +127,10 @@ instance (KnownMetric m, WMetric sig) => WMetric (Extend m sig) where
   one = Dim zero one
   scalarMV a = Dim zero (scalarMV a)
   nullMV = Dim nullMV nullMV
-  leftContraction (Dim a b) (Dim c d) =
-    let m = fromInteger (metricD (metric $ Proxy @m))
-     in Dim (leftContraction b c) (plus (leftContraction a ((m *) <$> hat c)) (leftContraction b d))
+
+  -- leftContraction (Dim a b) (Dim c d) =
+  --   let m = fromInteger (metricD (metric $ Proxy @m))
+  --    in Dim (leftContraction b c) (plus (leftContraction a ((m *) <$> hat c)) (leftContraction b d))
   dual (Dim a b) =
     let m = fromInteger (metricD (metric $ Proxy @m))
      in Dim (dual b) (hat $ (m *) <$> a)
@@ -144,6 +147,18 @@ instance (IsString coeff) => IsString (Multivector 'Empty coeff) where fromStrin
 
 instance (Num coeff, IsString (Multivector sig coeff), KnownMetric m, WMetric sig) => IsString (Multivector (Extend m sig) coeff) where
   fromString a = Dim zero (fromString a)
+
+-- exp :: forall sig a. Multivector sig a -> Multivector sig a
+-- exp = go 0 0
+--   where
+--     go :: forall sig. Int -> Int -> Multivector sig a -> Multivector sig a
+--     go grade sign d@(Dim l r) =
+--       let m = fromInteger $ metricD $ getMetric d
+--           sign' = sign * m
+--        in Dim (go (grade + 1))
+
+getMetric :: forall metric sig a. (KnownMetric metric) => Multivector (Extend metric sig) a -> Metric
+getMetric _ = metric (Proxy @metric)
 
 -- | Convert a multivector to a polynomial.
 -- The exponent will necessarily always be 1.
