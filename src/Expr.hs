@@ -22,21 +22,26 @@ instance Pretty Expr where
     where
       go _ (Lit n) = pretty n
       go _ (Var s) = pretty s
-      go p s@(Sum _ _) =
-        let terms = flattenSum s
-            formatTerm i (isNeg, e) =
-              let op = if i == 0
-                       then if isNeg then "-" else mempty
-                       else if isNeg then "- " else "+ "
-              in op <> go 0 e
-            docs = zipWith formatTerm [0..] terms
-        in parens' (p > 0) $ group $ align $ sep docs
-      go p (Product a b) = parens' (p > 1) $ go 1 a <+> go 1 b
+      -- go p s@(Sum _ _) =
+      --   let terms = flattenSum s
+      --       formatTerm i (isNeg, e) =
+      --         let op = if i == 0
+      --                  then if isNeg then "-" else mempty
+      --                  else if isNeg then "- " else "+ "
+      --         in op <> go 0 e
+      --       docs = zipWith formatTerm [0..] terms
+      --   in parens' (p > 0) $ group $ align $ sep docs
+      go p (Sum l r) = parens' (p > 0) $ group . align . sep $ go 0 l : goSum r
+      go p (Product a b) = parens' (p > 1) $ go 1 a <+> "*" <+> go 1 b
       go p (Neg e) = parens' (p > 2) $ "-" <> go 2 e
       go p (Pow e n) = go 4 e <> pretty (fmap toSuperscript (show n))
 
       parens' True d = parens d
       parens' False d = d
+
+      goSum (Neg e) = ["-" <+> go 0 e]
+      goSum (Sum l r) = goSum l ++ goSum r
+      goSum a = ["+" <+> go 0 a]
 
       flattenSum (Sum a b) = flattenSum a ++ flattenSum b
       flattenSum (Neg e) = [(True, e)]
@@ -88,17 +93,18 @@ simplify e0 = let e' = go e0 in if e0 == e' then e0 else simplify e'
     go (Product a (Lit b)) = Product (Lit b) (go a)
     go (Product (Neg a) b) = Neg (Product (go a) (go b))
     go (Product a (Neg b)) = Neg (Product (go a) (go b))
-    go (Product (Product a b) c) = Product a (Product b c)
+    go (Product (Product a b) c) = Product (go a) (Product (go b) (go c))
     go (Product a b) = Product (go a) (go b)
     --
-    go (Sum (Neg a) (Neg b)) = Neg (Sum (go a) (go b))
+    -- go (Sum (Neg a) (Neg b)) = Neg (Sum (go a) (go b))
     go (Sum (Lit 0) b) = go b
     go (Sum a (Lit 0)) = go a
     go (Sum (Lit a) (Lit b)) = Lit (a + b)
-    go (Sum (Sum a b) c) = Sum a (Sum b c)
+    go (Sum (Sum a b) c) = Sum (go a) (Sum (go b) (go c))
     go (Sum a b) = foldSum (go a) (go b)
     --
     go (Neg (Neg a)) = go a
+    go (Neg (Sum a b)) = Sum (Neg (go a)) (Neg (go b))
     go (Neg a) = Neg (go a)
     --
     go (Pow e 1) = go e
