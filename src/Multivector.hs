@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -12,15 +11,11 @@
 
 module Multivector where
 
-import Control.Applicative (liftA)
-import Control.Monad.Identity (Identity (runIdentity))
-import Control.Monad.State (State, evalState)
 import Data.Bool (bool)
 import Data.Data (Proxy (..))
 import Data.String (IsString)
 import Expr
 import GHC.Exts (IsString (..))
-import Polynomial (Poly (Poly), toExpr, var)
 import qualified Polynomial as Poly
 import Signature
 import qualified Util
@@ -103,8 +98,8 @@ class WMetric sig where
   one :: (Num a) => Multivector sig a
   scalarMV :: (Num a) => a -> Multivector sig a
   nullMV :: Multivector sig ()
-  dual :: (Num a) => Multivector sig a -> Multivector sig a
   withMetric :: Multivector sig a -> Multivector sig (a, [Metric])
+  pseudoScalar :: (Num a) => Multivector sig a
 
 -- TODO test aB = left a B + wedge a B
 -- leftContraction :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
@@ -116,9 +111,7 @@ instance WMetric Empty where
   one = Scalar 1
   scalarMV = Scalar
   nullMV = Scalar ()
-
-  -- leftContraction (Scalar a) (Scalar b) = Scalar (a * b)
-  dual (Scalar s) = Scalar s
+  pseudoScalar = Scalar 1
 
 instance (KnownMetric m, WMetric sig) => WMetric (Extend m sig) where
   dimSig _ = 1 + dimSig (Proxy @sig)
@@ -127,15 +120,9 @@ instance (KnownMetric m, WMetric sig) => WMetric (Extend m sig) where
   one = Dim zero one
   scalarMV a = Dim zero (scalarMV a)
   nullMV = Dim nullMV nullMV
+  pseudoScalar = Dim pseudoScalar zero
 
-  -- leftContraction (Dim a b) (Dim c d) =
-  --   let m = fromInteger (metricD (metric $ Proxy @m))
-  --    in Dim (leftContraction b c) (plus (leftContraction a ((m *) <$> hat c)) (leftContraction b d))
-  dual (Dim a b) =
-    let m = fromInteger (metricD (metric $ Proxy @m))
-     in Dim (dual b) (hat $ (m *) <$> a)
-
-type SymbolicMV sig sym = Multivector sig (Poly sym Int)
+type SymbolicMV sig sym = Multivector sig (Poly.Poly sym Int)
 
 dimMV :: forall sig a. (WMetric sig) => Multivector sig a -> Int
 dimMV _ = dimSig (Proxy @sig)
@@ -148,26 +135,27 @@ instance (IsString coeff) => IsString (Multivector 'Empty coeff) where fromStrin
 instance (Num coeff, IsString (Multivector sig coeff), KnownMetric m, WMetric sig) => IsString (Multivector (Extend m sig) coeff) where
   fromString a = Dim zero (fromString a)
 
--- exp :: forall sig a. Multivector sig a -> Multivector sig a
--- exp = go 0 0
---   where
---     go :: forall sig. Int -> Int -> Multivector sig a -> Multivector sig a
---     go grade sign d@(Dim l r) =
---       let m = fromInteger $ metricD $ getMetric d
---           sign' = sign * m
---        in Dim (go (grade + 1))
-
 getMetric :: forall metric sig a. (KnownMetric metric) => Multivector (Extend metric sig) a -> Metric
 getMetric _ = metric (Proxy @metric)
 
 -- | Convert a multivector to a polynomial.
 -- The exponent will necessarily always be 1.
-toPoly :: forall sig a. (Num a, Ord a, WMetric sig) => Multivector sig a -> Poly Int a
+toPoly :: forall sig a. (Num a, Ord a, WMetric sig) => Multivector sig a -> Poly.Poly Int a
 toPoly mv = go (dimMV mv) mv
   where
-    go :: forall sig. Int -> Multivector sig a -> Poly Int a
+    go :: forall sig. Int -> Multivector sig a -> Poly.Poly Int a
     go _ (Scalar a) = Poly.scalar a
     go dim (Dim a b) = Poly.var dim * go (dim - 1) a + go (dim - 1) b
+
+decompose :: (WMetric sig) => Multivector sig a -> [([Int], a)]
+decompose = foldr (:) [] . withDimensions
+
+withDimensions :: forall sig a. (WMetric sig) => Multivector sig a -> Multivector sig ([Int], a)
+withDimensions mv = go (dimMV mv) [] mv
+  where
+    go :: forall sig. Int -> [Int] -> Multivector sig a -> Multivector sig ([Int], a)
+    go _ dims (Scalar s) = Scalar (dims, s)
+    go dim dims (Dim a b) = Dim (go (dim - 1) (dim : dims) a) (go (dim - 1) dims b)
 
 instance (Eq a, Show a, Num a, Ord a, WMetric sig) => Show (Multivector sig a) where
   show a = Poly.showPoly showVar show $ toPoly a
@@ -177,10 +165,10 @@ showVar n 1 = "e" <> fmap Util.toSubscript (show n)
 showVar _ _ = error "impossible"
 
 mvExpr :: (WMetric sig) => SymbolicMV sig String -> Expr
-mvExpr = toExpr (\n -> Var $ "e" <> fmap Util.toSubscript (show n)) mExpr . toPoly
+mvExpr = Poly.toExpr (\n -> Var $ "e" <> fmap Util.toSubscript (show n)) mExpr . toPoly
 
-mExpr :: Poly String Int -> Expr
-mExpr = toExpr Var intLit
+mExpr :: Poly.Poly String Int -> Expr
+mExpr = Poly.toExpr Var intLit
 
 pretty :: (WMetric sig) => SymbolicMV sig String -> IO ()
 pretty mv = putStrLn (showExpr $ mvExpr mv)
@@ -196,6 +184,9 @@ mapGrade f = go 0
 grade :: (Num a) => Int -> Multivector sig a -> Multivector sig a
 grade k = mapGrade $ \dim a -> if dim == k then a else 0
 
+-- grades :: forall sig a. Num a => Multivector sig a -> [Multivector sig a]
+-- grades = _ . go where
+
 grade0 :: Multivector sig a -> a
 grade0 (Scalar a) = a
 grade0 (Dim _ b) = grade0 b
@@ -208,10 +199,10 @@ hat = mapGrade (bool negate id . even)
 rev :: forall sig a. (Num a) => Multivector sig a -> Multivector sig a
 rev = mapGrade (bool negate id . even . (`div` 2))
 
--- -- | Hodge dual
--- dual :: (Num a) => Multivector sig a -> Multivector sig a
--- dual (Scalar a) = Scalar a
--- dual (Dim a b) = Dim (dual b) (hat $ dual a)
+-- | Hodge dual
+dual :: (Num a) => Multivector sig a -> Multivector sig a
+dual (Scalar a) = Scalar a
+dual (Dim a b) = Dim (dual b) (hat $ dual a)
 
 -- | Inner (dot) product
 inner :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
@@ -222,6 +213,15 @@ inner = error "TODO: inner product"
 wedge :: (Num a) => Multivector sig a -> Multivector sig a -> Multivector sig a
 wedge (Scalar a) (Scalar b) = Scalar (a * b)
 wedge (Dim a b) (Dim c d) = Dim (plus (wedge a (hat d)) (wedge b c)) (wedge b d)
+
+-- "Largest subspace contained within the inputs"
+regressive :: forall sig a. (WMetric sig, Num a, Num (Multivector sig a)) => Multivector sig a -> Multivector sig a -> Multivector sig a
+regressive a b =
+  let d = dual
+      w = wedge
+      n = dimSig (Proxy :: Proxy sig)
+      dInv = if even n then d . hat else d
+   in dInv (w (d a) (d b))
 
 normSquared :: (Num a, Num (Multivector sig a)) => Multivector sig a -> a
 normSquared a = grade0 $ rev a * a

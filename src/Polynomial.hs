@@ -13,7 +13,7 @@ module Polynomial
   )
 where
 
-import Data.List (intercalate)
+import Data.List (intercalate, intersperse)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.String (IsString (..))
@@ -70,7 +70,7 @@ showPoly fVar fCoeff (Poly m) = case Map.toAscList m of
     showTail t = case fTerm t of
       (t', True) -> " + " <> t'
       (t', False) -> " - " <> t'
-    fVars = concatMap (uncurry fVar)
+    fVars = intercalate " * " . fmap (uncurry fVar)
     fTerm (vars', coeff') = case (Map.toAscList vars', coeff') of
       (_, 0) -> error "impossible"
       ([], 1) -> ("1", True)

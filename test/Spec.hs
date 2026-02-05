@@ -128,8 +128,17 @@ main = hspec $ do
   -- 3. Linearity: dual(a + b) = dual(a) + dual(b)
 
   describe "dual" $ do
-    propG "involution" $ with mk1 $ \a -> dual (dual a) == a
-  -- todo
+    propG "involution" $ do
+      a <- mk1
+      n <- asks dimSig
+      pure $ dual (dual a) == if odd n then a else hat a
+    propG "linearity" $ with mk2 $ \(a, b) -> dual (a + b) == dual a + dual b
+    propG "grade mirroring" $ do
+       a <- mk1
+       n <- asks dimSig
+       pure $ all (\k -> grade (n - k) (dual (grade k a)) == dual (grade k a)) [0 .. n]
+    propG "complement check" $ with symbolicBasis $ \basis ->
+       all (\b -> let p = b * dual b in p == pseudoScalar || p == -pseudoScalar) basis
 
   describe "exterior product" $ do
     propG "antisymmetry" $ with mk2 $ \(a, b) ->
@@ -150,6 +159,11 @@ main = hspec $ do
             wedge a (s * b)
           ]
     propG "geometric product" $ with mk2 $ \(a, b) -> let a' = grade 1 a; b' = grade 1 b in 2 * wedge a' b' == a' * b' - b' * a'
+
+  describe "regressive product" $ do
+    propG "associativity" $ with mk3 $ \(a, b, c) -> regressive (regressive a b) c == regressive a (regressive b c)
+    propG "left distributivity" $ with mk3 $ \(a, b, c) -> regressive a (b + c) == regressive a b + regressive a c
+    propG "right distributivity" $ with mk3 $ \(a, b, c) -> regressive (a + b) c == regressive a c + regressive b c
 
 -- -----------------------------------------------------------------------------
 -- Inner Product (inner) [TODO]

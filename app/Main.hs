@@ -5,29 +5,18 @@
 
 module Main where
 
+import Control.Monad (forM_)
 import Data.String (IsString (fromString))
 import Multivector
-import Polynomial (toExpr)
+import Polynomial (showPoly)
 import Signature
 import Util (toSubscript)
-
-bivectorBase :: (Num a) => [a] -> [a]
-bivectorBase [] = []
-bivectorBase (a : as) = ((a *) <$> as) <> bivectorBase as
-
-trivectorBase :: (Num a) => [a] -> [a]
-trivectorBase (a : as) = ((a *) <$> bivectorBase as) <> trivectorBase as
-trivectorBase [] = []
-
-quadvectorBase :: (Num a) => [a] -> [a]
-quadvectorBase (a : as) = ((a *) <$> trivectorBase as) <> quadvectorBase as
-quadvectorBase [] = []
 
 var :: (IsString (SymbolicMV sig String)) => String -> SymbolicMV sig String
 var = fromString
 
 generic :: (IsString (SymbolicMV sig String), Num (SymbolicMV sig String)) => [SymbolicMV sig String] -> [String] -> SymbolicMV sig String
-generic basis syms = sum ((\(b, v) -> var v * b) <$> zip basis syms)
+generic base syms = sum ((\(b, v) -> var v * b) <$> zip base syms)
 
 subscripted :: String -> [String]
 subscripted c = [c <> fmap toSubscript (show i) | i <- [(1 :: Int) ..]]
@@ -35,35 +24,73 @@ subscripted c = [c <> fmap toSubscript (show i) | i <- [(1 :: Int) ..]]
 subscripted0 :: String -> [String]
 subscripted0 c = [c <> fmap toSubscript (show i) | i <- [(0 :: Int) ..]]
 
+prefixed :: String -> [String] -> [String]
+prefixed prefix = fmap (prefix <>)
+
+pairs :: [a] -> [(a, a)]
+pairs [] = []
+pairs (a : as) = ((,) a <$> as) <> pairs as
+
+grades :: (Eq a, Num a) => Multivector PGA3D a -> [Multivector PGA3D a]
+grades mv = filter (/= 0) [mapGrade (\g a -> if d == g then a else 0) mv | d <- [0 .. 4]]
+
+format :: SymbolicMV PGA3D String -> String
+format = unlines . fmap (\(dims, term) -> showDims dims <> ":\t" <> showPoly const show term) . filter ((/= 0) . snd) . decompose
+  where
+    showDims :: [Int] -> String
+    showDims [] = "s"
+    showDims ds = fmap (\i -> "xyzw" !! (i - 1)) ds
+
 main :: IO ()
 main = do
   let [x, y, z, w] = basis :: [SymbolicMV PGA3D String]
 
-      -- pointbasis = [y*z*w, x*z*w, x*y*w, x*y*z]
-      pointbasis = [w * y * z, w * x * z, x * y * w, x * y * z]
-      pointvars = ["yzw", "xzw", "xyz", "xyz"]
+      planebasis = [w, x, y, z]
+      planevars = ["w", "x", "y", "z"]
 
-      linebasis = [x * y, x * z, y * z, w * x, w * y, w * z]
-      linevars = ["xy", "xz", "yz", "wx", "wy", "wz"]
+      pointbasis = [w * z * y, w * x * z, w * y * x, x * y * z]
+      pointvars = ["wzy", "wxz", "wyx", "xyz"]
+
+      bivectorbasis = [y * z, z * x, x * y]
+      bivectorvars = ["yz", "zx", "xy"]
+
+      linebasis = [y * z, z * x, x * y, w * x, w * y, w * z]
+      linevars = ["yz", "zx", "xy", "wx", "wy", "wz"]
+
+      rotorbasis = [1, y * z, z * x, x * y]
+      rotorvars = ["s", "yz", "zx", "xy"]
 
       motorbasis = [1, y * z, z * x, x * y, w * x, w * y, w * z, w * x * y * z]
       motorvars = ["s", "yz", "zx", "xy", "wx", "wy", "wz", "wxyz"]
 
-      m = generic motorbasis (("m." <>) <$> motorvars)
-      l = generic linebasis (("l." <>) <$> linevars)
-      t = generic pointbasis (("t." <>) <$> pointvars)
-      u = generic (take 3 linebasis) (subscripted "b")
+      i = w * x * y * z
 
-      linebasis' = [y * z, z * x, x * y, w * x, w * y, w * z]
-      b = generic linebasis' (subscripted "b")
+      pl1 = generic planebasis (subscripted "pl1")
+      pl2 = generic planebasis (subscripted "pl2")
 
-      m1 = generic motorbasis (subscripted0 "b")
-      m2 = generic motorbasis (subscripted0 "a")
+      l1 = generic linebasis (subscripted "l1")
+      l2 = generic linebasis (subscripted "l2")
 
-  -- print $ mExpr $ normSquared p1
-  print . mvExpr $ m2 * m1
+      pt1 = generic pointbasis (subscripted "pt1")
+      pt2 = generic pointbasis (subscripted "pt2")
 
--- print . mvExpr $ b * b
--- mapM_ (print . mvExpr) pointbasis
+      primitives p =
+        [ ("plane", generic planebasis (prefixed p planevars)),
+          ("line", generic linebasis (prefixed p linevars)),
+          ("point", generic pointbasis (prefixed p pointvars))
+        ]
 
--- print . mvExpr $
+  forM_ (liftA2 (,) (primitives "a.") (primitives "b.")) $ \((na, a), (nb, b)) -> do
+    putStrLn ""
+    putStrLn $ "=== " <> na <> " x " <> nb <> " ==="
+    putStrLn ""
+    putStrLn . format $ (a * b)
+    putStrLn ""
+    print . mvExpr $ a * b
+
+-- putStrLn ""
+-- putStrLn $ na <> " * " <> nb <> ":"
+-- mapM_ putStrLn $ intersperse "+" $ fmap (show . mvExpr) (grades $ a * b)
+-- putStrLn ""
+-- putStrLn $ na <> " \\/ " <> nb <> ":"
+-- print . mvExpr $ regressive a b
